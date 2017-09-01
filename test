@@ -1,0 +1,1 @@
+nearleyc $1.ne -o $1.js && nearley-test -i "$2" $1.js

@@ -21,12 +21,12 @@ const lexer = moo.compile({
 const flatten = function(arr) {
   return arr.reduce(function (flat, toFlatten) {
     return flat.concat(Array.isArray(toFlatten) ? flatten(toFlatten) : toFlatten);
-  }, []).filter(notNull);
+  }, []);
 }
 
 const notNull = (item) => !!item;
 
-const formatFn = (arr)=>{
+const parseFml = (arr)=>{
     arr[0].args = flatten(arr.slice(1,-1)); 
     arr[0].value = arr[0].text = arr[0].value.replace(/ *\($/, '');
     return arr[0];
@@ -34,10 +34,10 @@ const formatFn = (arr)=>{
 
 const args = (arr) => [arr[0]].concat(arr.splice(1).map((item)=>item[0]))
 
-const ungroup = (arr) => {
-    return [arr[1]].concat(
-        arr[3].reduce((flat, item) => {
-            flat.push(item[0], item[2]);
+const ungroup = (n) => (arr) => {
+    return arr.slice(0,n).concat(
+        arr[n].reduce((flat, item) => {
+            flat.push.apply(flat, item);
             return flat;
         }, [])
     );
@@ -96,35 +96,35 @@ var grammar = {
     {"name": "exp$ebnf$1", "symbols": []},
     {"name": "exp$ebnf$1$subexpression$1", "symbols": ["op", "_", "member", "_"]},
     {"name": "exp$ebnf$1", "symbols": ["exp$ebnf$1", "exp$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
-    {"name": "exp", "symbols": ["_", "member", "_", "exp$ebnf$1"], "postprocess": ungroup},
+    {"name": "exp", "symbols": ["_", "member", "_", "exp$ebnf$1"], "postprocess": ungroup(3)},
     {"name": "member", "symbols": ["nb"], "postprocess": id},
     {"name": "member", "symbols": ["parentesis"], "postprocess": id},
-    {"name": "member", "symbols": ["dynxp"]},
-    {"name": "member", "symbols": ["fmlxp"]},
-    {"name": "member", "symbols": ["rngxp"]},
+    {"name": "member", "symbols": ["dynxp"], "postprocess": id},
+    {"name": "member", "symbols": ["fmlxp"], "postprocess": id},
+    {"name": "member", "symbols": ["rngxp"], "postprocess": id},
     {"name": "dynxp", "symbols": [{"literal":"%"}, "rngxp"]},
     {"name": "dynxp", "symbols": [{"literal":"%"}, "fmlxp"]},
     {"name": "parentesis", "symbols": [{"literal":"("}, "_", "exp", "_", {"literal":")"}]},
-    {"name": "rngxp", "symbols": ["rng"]},
-    {"name": "rngxp", "symbols": ["dynrngxp"]},
+    {"name": "rngxp", "symbols": ["rng"], "postprocess": id},
+    {"name": "rngxp", "symbols": ["dynrngxp"], "postprocess": id},
     {"name": "dynrngxp$ebnf$1", "symbols": []},
     {"name": "dynrngxp$ebnf$1$subexpression$1", "symbols": ["rngop", "rngcount", "rngtp"]},
     {"name": "dynrngxp$ebnf$1", "symbols": ["dynrngxp$ebnf$1", "dynrngxp$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
-    {"name": "dynrngxp", "symbols": ["dynrng", "dynrngxp$ebnf$1"]},
-    {"name": "fmlxp", "symbols": ["fml", "args", "_", {"literal":")"}]},
+    {"name": "dynrngxp", "symbols": ["dynrng", "dynrngxp$ebnf$1"], "postprocess": ungroup(1)},
+    {"name": "fmlxp", "symbols": ["fml", "args", "_", {"literal":")"}], "postprocess": parseFml},
     {"name": "fmlxp", "symbols": ["dynfml", "args", "_", {"literal":")"}]},
     {"name": "args$ebnf$1", "symbols": []},
     {"name": "args$ebnf$1$subexpression$1", "symbols": ["_", {"literal":";"}, "_", "exp"]},
     {"name": "args$ebnf$1", "symbols": ["args$ebnf$1", "args$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
-    {"name": "args", "symbols": ["exp", "args$ebnf$1"]},
+    {"name": "args", "symbols": ["exp", "args$ebnf$1"], "postprocess": ungroup(1)},
     {"name": "op", "symbols": [(st.has("op") ? {type: "op"} : op)], "postprocess": id},
     {"name": "nb", "symbols": [(st.has("nb") ? {type: "nb"} : nb)], "postprocess": id},
-    {"name": "rng", "symbols": [(st.has("rng") ? {type: "rng"} : rng)]},
-    {"name": "dynrng", "symbols": [(st.has("dynrng") ? {type: "dynrng"} : dynrng)]},
-    {"name": "rngop", "symbols": [(st.has("rngop") ? {type: "rngop"} : rngop)]},
-    {"name": "rngcount", "symbols": [(st.has("rngcount") ? {type: "rngcount"} : rngcount)]},
-    {"name": "rngtp", "symbols": [(st.has("rngtp") ? {type: "rngtp"} : rngtp)]},
-    {"name": "fml", "symbols": [(st.has("fml") ? {type: "fml"} : fml)]},
+    {"name": "rng", "symbols": [(st.has("rng") ? {type: "rng"} : rng)], "postprocess": id},
+    {"name": "dynrng", "symbols": [(st.has("dynrng") ? {type: "dynrng"} : dynrng)], "postprocess": id},
+    {"name": "rngop", "symbols": [(st.has("rngop") ? {type: "rngop"} : rngop)], "postprocess": id},
+    {"name": "rngcount", "symbols": [(st.has("rngcount") ? {type: "rngcount"} : rngcount)], "postprocess": id},
+    {"name": "rngtp", "symbols": [(st.has("rngtp") ? {type: "rngtp"} : rngtp)], "postprocess": id},
+    {"name": "fml", "symbols": [(st.has("fml") ? {type: "fml"} : fml)], "postprocess": id},
     {"name": "dynfml", "symbols": [(st.has("dynfml") ? {type: "dynfml"} : dynfml)]},
     {"name": "_$ebnf$1", "symbols": [(st.has("spc") ? {type: "spc"} : spc)], "postprocess": id},
     {"name": "_$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},

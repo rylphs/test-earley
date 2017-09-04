@@ -20,10 +20,12 @@ const flatten = function(arr) {
   }, []);
 }
 
+const second = ([,item]) => item;
+
 const notNull = (item) => !!item;
 
 const parseFml = (arr)=>{
-    arr[0].args = flatten(arr.slice(1,-1)); 
+    arr[0].args = (arr.slice(1,-1)); 
     arr[0].value = arr[0].text = arr[0].value.replace(/ *\($/, '');
     return arr[0];
 }
@@ -58,13 +60,13 @@ const st = moo.states({
         lp: {match: /\(/},
         rp: {match: /\)/, pop: true},
         fml: {match: /[a-zA-Z0-9]+[ \t]*\(/, push: "main"},
+        param: {match: /\%[0-9]+/},
         dyn: {match: /\%/, push: "dyn"},
-        //dynfml: {match: /\%[\w]+[ \t]*\(/, push: "main"},
-        //dynrng: {match: /\%(?:cell|row|col)/, push:"rngsel"},
         rng: {match: /(?:[a-zA-Z]+[0-9]+(?:\:[a-zA-Z]+[0-9]+)?|[a-zA-Z]+\:[a-zA-Z]+|[0-9]+\:[0-9]+)/},
         nb: {match: /[0-9]*\,?[0-9]+/},
         pspl: {match: /;/},
         spc: {match: /[\t ]+/}
+        
     },
     dyn: {
         dynfml: {match: /[\w]+[ \t]*\(/, next: "main"},
@@ -90,13 +92,13 @@ const st = moo.states({
 
 @lexer st
 
-exp -> _ member _ (op _ member _ ):*  {%ungroup(3)%}
-member -> nb {%id%}  | parentesis {%id%} | dynxp {%id%}| fmlxp {%id%}| rngxp {%id%}
-dynxp -> "%" rngxp | "%" fmlxp 
+exp -> _ member _ (op _ member _ ):* {%ungroup(3)%}
+member -> nb {%id%}  | parentesis {%id%} | dynxp {%id%}| fmlxp {%id%}| rngxp {%id%} | str_ cnst _str {%second%} | param
+dynxp -> "%" rngxp | "%" fmlxp {%second%}
 parentesis -> "(" _ exp _ ")"
 rngxp -> rng {%id%} | dynrngxp {%id%}
 dynrngxp -> dynrng (rngop rngcount rngtp):* {%ungroup(1)%}
-fmlxp -> fml args _ ")" {%parseFml%} | dynfml args _ ")"
+fmlxp -> fml args _ ")" {%parseFml%} | dynfml args _ ")" {%parseFml%}
 args -> exp (_ ";" _ exp):* {%ungroup(1)%}
 
 op -> %op {%id%}
@@ -108,5 +110,9 @@ rngcount -> %rngcount {%id%}
 rngtp -> %rngtp {%id%}
 #_dynrng -> %_dynrng
 fml -> %fml {%id%}
-dynfml -> %dynfml
+dynfml -> %dynfml {%id%}
+_str -> %_str {%id%}
+str_ -> %str_ {%id%}
+cnst -> %cnst {%id%}
+param -> %param {%id%}
 _ -> %spc:? {%id%}

@@ -24,10 +24,12 @@ const flatten = function(arr) {
   }, []);
 }
 
+const second = ([,item]) => item;
+
 const notNull = (item) => !!item;
 
 const parseFml = (arr)=>{
-    arr[0].args = flatten(arr.slice(1,-1)); 
+    arr[0].args = (arr.slice(1,-1)); 
     arr[0].value = arr[0].text = arr[0].value.replace(/ *\($/, '');
     return arr[0];
 }
@@ -62,13 +64,13 @@ const st = moo.states({
         lp: {match: /\(/},
         rp: {match: /\)/, pop: true},
         fml: {match: /[a-zA-Z0-9]+[ \t]*\(/, push: "main"},
+        param: {match: /\%[0-9]+/},
         dyn: {match: /\%/, push: "dyn"},
-        //dynfml: {match: /\%[\w]+[ \t]*\(/, push: "main"},
-        //dynrng: {match: /\%(?:cell|row|col)/, push:"rngsel"},
         rng: {match: /(?:[a-zA-Z]+[0-9]+(?:\:[a-zA-Z]+[0-9]+)?|[a-zA-Z]+\:[a-zA-Z]+|[0-9]+\:[0-9]+)/},
         nb: {match: /[0-9]*\,?[0-9]+/},
         pspl: {match: /;/},
         spc: {match: /[\t ]+/}
+        
     },
     dyn: {
         dynfml: {match: /[\w]+[ \t]*\(/, next: "main"},
@@ -102,8 +104,10 @@ var grammar = {
     {"name": "member", "symbols": ["dynxp"], "postprocess": id},
     {"name": "member", "symbols": ["fmlxp"], "postprocess": id},
     {"name": "member", "symbols": ["rngxp"], "postprocess": id},
+    {"name": "member", "symbols": ["str_", "cnst", "_str"], "postprocess": second},
+    {"name": "member", "symbols": ["param"]},
     {"name": "dynxp", "symbols": [{"literal":"%"}, "rngxp"]},
-    {"name": "dynxp", "symbols": [{"literal":"%"}, "fmlxp"]},
+    {"name": "dynxp", "symbols": [{"literal":"%"}, "fmlxp"], "postprocess": second},
     {"name": "parentesis", "symbols": [{"literal":"("}, "_", "exp", "_", {"literal":")"}]},
     {"name": "rngxp", "symbols": ["rng"], "postprocess": id},
     {"name": "rngxp", "symbols": ["dynrngxp"], "postprocess": id},
@@ -112,7 +116,7 @@ var grammar = {
     {"name": "dynrngxp$ebnf$1", "symbols": ["dynrngxp$ebnf$1", "dynrngxp$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
     {"name": "dynrngxp", "symbols": ["dynrng", "dynrngxp$ebnf$1"], "postprocess": ungroup(1)},
     {"name": "fmlxp", "symbols": ["fml", "args", "_", {"literal":")"}], "postprocess": parseFml},
-    {"name": "fmlxp", "symbols": ["dynfml", "args", "_", {"literal":")"}]},
+    {"name": "fmlxp", "symbols": ["dynfml", "args", "_", {"literal":")"}], "postprocess": parseFml},
     {"name": "args$ebnf$1", "symbols": []},
     {"name": "args$ebnf$1$subexpression$1", "symbols": ["_", {"literal":";"}, "_", "exp"]},
     {"name": "args$ebnf$1", "symbols": ["args$ebnf$1", "args$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
@@ -125,7 +129,11 @@ var grammar = {
     {"name": "rngcount", "symbols": [(st.has("rngcount") ? {type: "rngcount"} : rngcount)], "postprocess": id},
     {"name": "rngtp", "symbols": [(st.has("rngtp") ? {type: "rngtp"} : rngtp)], "postprocess": id},
     {"name": "fml", "symbols": [(st.has("fml") ? {type: "fml"} : fml)], "postprocess": id},
-    {"name": "dynfml", "symbols": [(st.has("dynfml") ? {type: "dynfml"} : dynfml)]},
+    {"name": "dynfml", "symbols": [(st.has("dynfml") ? {type: "dynfml"} : dynfml)], "postprocess": id},
+    {"name": "_str", "symbols": [(st.has("_str") ? {type: "_str"} : _str)], "postprocess": id},
+    {"name": "str_", "symbols": [(st.has("str_") ? {type: "str_"} : str_)], "postprocess": id},
+    {"name": "cnst", "symbols": [(st.has("cnst") ? {type: "cnst"} : cnst)], "postprocess": id},
+    {"name": "param", "symbols": [(st.has("param") ? {type: "param"} : param)], "postprocess": id},
     {"name": "_$ebnf$1", "symbols": [(st.has("spc") ? {type: "spc"} : spc)], "postprocess": id},
     {"name": "_$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "_", "symbols": ["_$ebnf$1"], "postprocess": id}

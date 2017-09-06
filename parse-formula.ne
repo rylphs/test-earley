@@ -4,13 +4,18 @@ const moo = require("moo");
 const second = ([,item]) => item;
 
 const parseFml = (arr)=>{
-    var args = arr.slice(1, -1);
-    arr[0].args = args[0].concat(args[1].reduce((flat, item)=> {
-        flat.push.apply(flat, item.map((i) => (i instanceof Array ? i[0] : i)))
-        return flat;
-    }, [])); 
-    return arr[0];
+    arr[1].args = arr.slice(2,-1); 
+    arr[1].end = arr[arr.length-1].offset   ;
+    return arr[1];
+    return flatten(arr).slice(1,-1);
 }
+
+const parseRng = (arr)=> {
+    arr[1].args = arr[2].map((arg)=> (
+        {op:arg[0], count: arg[1], tp: arg[2]}
+    ));
+    return arr[1];
+};
 
 const parseParentesis = (arr)=> {
     var args = arr.slice(1, -1)[0];
@@ -27,17 +32,41 @@ const ungroup = (n) => (arr) => {
     );
 }
 
+const flatten = (arr) => {
+    return arr.reduce((flat, item) =>{
+        if(item instanceof Array)
+            flat.push.apply(flat, flatten(item));
+        else if(!!item) flat.push(item);
+        return flat;
+    },[]);
+}
+
 const ignore = (arr) => null;
+const getParam = (arr) => {
+    return grammar.args[grammar.args.length-1][arr[0].value];
+}
+
+const ignoreFml = (arr) => flatten(arr).slice(1,-1);
+const content = (arr) => arr.slice(1,-2)[0]; 
+
+const value = (arr) => {
+    arr[0].end = arr[0].offset + (arr[0].value.length - 1);
+    return arr[0];
+}
+
+const join = (arr) => arr.join("");
+
 
 const lexer = moo.states({
     main: {
+        cnst: {match: /\"[^\"]*\"/},
         op: {match: /[\+\*\-\^\/]/},
-        str_: {match: '"', push: "str"},
         var: {match: /\$\{[0-9]+\}/},
         lp: {match: /\(/},
         rp: {match: /\)/, pop: true},
         fml: {match: /[a-zA-Z0-9]+[ \t]*\(/, push: "main", value: name => name.replace(/\($/, '')},
-        param: {match: /\%(?:0|[1-9][0-9]*)/, value: n => Number(n.substring(1))},
+        param: {match: /\%(?:0|[1-9][0-9]*)/, 
+            value: (n) => n.substring(1)},
         dyn: {match: /\%/, push: "dyn"},
         rng: {match: /(?:[a-zA-Z]+[0-9]+(?:\:[a-zA-Z]+[0-9]+)?|[a-zA-Z]+\:[a-zA-Z]+|[0-9]+\:[0-9]+)/},
         nb: {match: /[0-9]*\,?[0-9]+/},
@@ -57,10 +86,6 @@ const lexer = moo.states({
         pspl: {match: /;/, pop:true},
         spc: {match: /[\t ]+/, pop:true}
        // _dynrng: {match: /(?:[ \t\;\)])/, pop: true}
-    },
-    str:{
-        cnst: {match: /[^"]+/, lineBreaks: true},
-        _str: {match: '"', pop: true}
     }
 })
 
@@ -69,29 +94,28 @@ const lexer = moo.states({
 
 @lexer lexer
 
-exp -> member (op member):* {%ungroup(1)%}
-member -> nb {%ignore%} | fmlxp {%id%} | parentesis {%id%} | 
-    dynxp {%id%}| rngxp {%id%} |
-    str_ cnst _str {%second%} | param
-dynxp -> "%" rngxp {%second%}| "%" fmlxp {%second%}
-parentesis -> "(" exp ")" {%parseParentesis%}
-rngxp -> rng {%id%} | dynrngxp {%id%}
-dynrngxp -> dynrng (rngop rngcount rngtp):* {%ungroup(1)%}
-fmlxp -> fml exp (%pspl exp):* ")" {%parseFml%} | 
-    dynfml exp (%pspl exp):* ")" {%parseFml%}
+main -> exp {%id%}
+exp -> member (op member):* {%flatten%}
+member -> 
+    cnst {%value%} |
+    nb {%value%} |
+    "(" exp ")" {%second%} |
+    fml exp (pspl exp):* ")" |
+    rng {%id%} |
+    "%" dynfml exp (pspl exp):* ")" {%parseFml%} |
+    "%" dynrng (rngop rngcount rngtp):* {%parseRng%}|
+    %param {%getParam%}
 
-op -> %op {%ignore%}
-nb -> %nb {%ignore%}
+op -> %op {%value%}
+nb -> %nb {%id%}
+cnst -> %cnst {%id%}
 rng -> %rng {%id%}
+pspl -> %pspl {%ignore%}
 dynrng -> %dynrng {%id%}
 rngop -> %rngop {%id%}
 rngcount -> %rngcount {%id%}
 rngtp -> %rngtp {%id%}
-#_dynrng -> %_dynrng
 fml -> %fml {%id%}
 dynfml -> %dynfml {%id%}
-_str -> %_str {%id%}
-str_ -> %str_ {%id%}
-cnst -> %cnst {%id%}
 param -> %param {%id%}
 _ -> %spc:? {%id%}
